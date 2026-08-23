@@ -513,6 +513,35 @@ mod tests {
     }
 
     #[test]
+    fn parse_developer_data_with_a_late_field_description() {
+        // Same file as `parse_developer_data`, with the field_description
+        // moved behind the record messages that refer to it. The spec asks
+        // for the description first, but recorders exist that emit the
+        // definition ahead of it, and the definition carries enough width
+        // information to step over the value either way.
+        let data = include_bytes!("../tests/fixtures/DeveloperDataLateDescription.fit").to_vec();
+        let fit_data = from_bytes(&data).unwrap();
+        assert_eq!(fit_data.len(), 6);
+
+        // The developer field is dropped, because nothing had described it
+        // when the record was read...
+        assert_eq!(fit_data[2].fields().len(), 4);
+        assert!(
+            fit_data[2]
+                .fields()
+                .iter()
+                .all(|f| f.name() != "doughnuts_earned")
+        );
+
+        // ...while every native field of that same record survives intact.
+        let native: Vec<_> = fit_data[2].fields().iter().map(|f| f.name()).collect();
+        assert_eq!(
+            native,
+            vec!["heart_rate", "cadence", "distance", "enhanced_speed"]
+        );
+    }
+
+    #[test]
     fn parse_monitoring_file() {
         let data = include_bytes!("../tests/fixtures/MonitoringFile.fit").to_vec();
         let fit_data = from_bytes(&data).unwrap();

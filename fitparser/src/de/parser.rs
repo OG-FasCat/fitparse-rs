@@ -516,14 +516,19 @@ fn data_message_fields_impl<'a>(
     }
     // handle developer fields analogously to fixed fields
     for field_def in &def_mesg.developer_field_definitions {
-        let dev_field_description = developer_field_descriptions
+        let Some(dev_field_description) = developer_field_descriptions
             .get(&(field_def.developer_data_index, field_def.field_number))
-            .ok_or({
-                nom::Err::Error(nom::error::Error {
-                    input,
-                    code: nom::error::ErrorKind::Fail,
-                })
-            })?;
+        else {
+            // A developer field whose description has not been seen yet. The
+            // description may still arrive: the spec asks for it ahead of the
+            // definition message, but recorders exist that emit the definition
+            // first and the description a few messages later. The definition
+            // carries the field's width, so the value can be stepped over and
+            // the rest of the message decoded rather than failing the file.
+            let (i, _) = nom::bytes::complete::take(field_def.size)(input)?;
+            input = i;
+            continue;
+        };
         let (i, value) = data_field_value(
             input,
             dev_field_description.fit_base_type_id,
